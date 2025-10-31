@@ -24,10 +24,15 @@ jobs:
             cmake \
             pkg-config \
             libpq-dev \
+            libpqxx-dev \
             libssl-dev \
             zlib1g-dev \
             libmosquitto-dev \
             librabbitmq-dev
+
+      # 🔧 always start from a clean build dir
+      - name: Clean build dir
+        run: rm -rf ${{ matrix.project }}/build-ci
 
       - name: Configure ${{ matrix.project }}
         run: cmake -S ${{ matrix.project }} -B ${{ matrix.project }}/build-ci -DCMAKE_BUILD_TYPE=Release
@@ -38,3 +43,38 @@ jobs:
       - name: Test ${{ matrix.project }}
         run: ctest --output-on-failure
         working-directory: ${{ matrix.project }}/build-ci
+
+  deploy-to-pi:
+    runs-on: [self-hosted, Linux, ARM64, replic-01]
+    needs: build
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime/build deps on Pi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            build-essential \
+            libpq-dev \
+            libpqxx-dev \
+            libssl-dev \
+            zlib1g-dev \
+            libmosquitto-dev \
+            librabbitmq-dev
+
+      - name: Clean Pi build dir
+        run: rm -rf Consumer/build-ci
+
+      - name: Configure on Pi
+        run: cmake -S Consumer -B Consumer/build-ci -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build on Pi
+        run: cmake --build Consumer/build-ci --config Release
+
+      - name: Deploy to local service
+        run: |
+          sudo mkdir -p /opt/cw-data-handler
+          sudo cp Consumer/build-ci/cw-data-transfer /opt/cw-data-handler/ || true
+          # sudo systemctl restart cw-data-handler.service
