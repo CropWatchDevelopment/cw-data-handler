@@ -1,17 +1,21 @@
 cmake_minimum_required(VERSION 3.20)
 project(cw-data-transfer LANGUAGES CXX)
 
+# ------------------------------------------------------------
+# C++ setup
+# ------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# we may use pkg-config for libpq and libpqxx
+# ------------------------------------------------------------
+# pkg-config (for libpq, libpqxx)
+# ------------------------------------------------------------
 find_package(PkgConfig REQUIRED)
 
 # ------------------------------------------------------------
-# 1) libpq (the C client, from libpq-dev)
+# 1) libpq (C client)
 # ------------------------------------------------------------
-# On Ubuntu this works:
 pkg_check_modules(LIBPQ REQUIRED libpq)
 
 add_library(libpq_iface INTERFACE)
@@ -19,29 +23,27 @@ target_include_directories(libpq_iface INTERFACE ${LIBPQ_INCLUDE_DIRS})
 target_link_libraries(libpq_iface INTERFACE ${LIBPQ_LIBRARIES})
 
 # ------------------------------------------------------------
-# 2) libpqxx (the C++ client, from libpqxx-dev)
+# 2) libpqxx (C++ client)
 # ------------------------------------------------------------
-# First try official CMake package (some distros ship it). Ubuntu’s often doesn’t.
 find_package(pqxx QUIET)
 
 if(NOT pqxx_FOUND)
-    # fall back to pkg-config
     pkg_check_modules(PQXX REQUIRED libpqxx)
     add_library(pqxx_iface INTERFACE)
     target_include_directories(pqxx_iface INTERFACE ${PQXX_INCLUDE_DIRS})
     target_link_libraries(pqxx_iface INTERFACE ${PQXX_LIBRARIES})
     set(PQXX_TARGET pqxx_iface)
 else()
-    # should give us pqxx::pqxx
+    # system package that exports pqxx::pqxx
     set(PQXX_TARGET pqxx::pqxx)
 endif()
 
 # ------------------------------------------------------------
-# FetchContent for the stuff that actually needs to be fetched
+# 3) FetchContent deps
 # ------------------------------------------------------------
 include(FetchContent)
 
-# simdjson
+# simdjson ---------------------------------------------------
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -51,18 +53,18 @@ set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
 
-# rabbitmq-c
+# rabbitmq-c -------------------------------------------------
 FetchContent_Declare(
     rabbitmqc
     GIT_REPOSITORY https://github.com/alanxz/rabbitmq-c.git
     GIT_TAG v0.14.0
 )
-# we'll let it build default, you can tune these:
+# match the way CI is building it
 set(ENABLE_SSL OFF CACHE BOOL "" FORCE)
 set(ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rabbitmqc)
 
-# paho-mqtt-c
+# paho-mqtt-c ------------------------------------------------
 FetchContent_Declare(
     paho_mqtt_c
     GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
@@ -76,7 +78,7 @@ set(PAHO_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(paho_mqtt_c)
 
 # ------------------------------------------------------------
-# your sources
+# sources
 # ------------------------------------------------------------
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
@@ -85,43 +87,47 @@ file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
+# ------------------------------------------------------------
 # rabbitmq target name normalization
+# ------------------------------------------------------------
 if(TARGET rabbitmq::rabbitmq)
     set(RABBITMQ_TARGET rabbitmq::rabbitmq)
 elseif(TARGET rabbitmq)
     set(RABBITMQ_TARGET rabbitmq)
 else()
-    message(FATAL_ERROR "rabbitmq-c target not found")
+    message(FATAL_ERROR "rabbitmq-c target not found (expected rabbitmq::rabbitmq or rabbitmq)")
 endif()
 
-# locate amqp headers (rabbitmq-c)
-set(RABBITMQ_INCLUDE_CANDIDATES
+# ------------------------------------------------------------
+# rabbitmq-c *headers* for CI
+#
+# GitHub Actions builds rabbitmq-c via FetchContent, so the headers live under:
+#   Consumer/build-ci/_deps/rabbitmqc-src/...
+# NOT /usr/include.
+#
+# We just add every plausible dir instead of playing guessing games.
+# ------------------------------------------------------------
+# After FetchContent_MakeAvailable, these should exist:
+#   rabbitmqc_SOURCE_DIR
+#   rabbitmqc_BINARY_DIR
+set(RABBITMQC_INCLUDE_DIRS
+    "${rabbitmqc_SOURCE_DIR}"
     "${rabbitmqc_SOURCE_DIR}/include"
-    "${rabbitmqc_BINARY_DIR}/include"
     "${rabbitmqc_SOURCE_DIR}/librabbitmq"
+    "${rabbitmqc_BINARY_DIR}"
+    "${rabbitmqc_BINARY_DIR}/include"
     "${rabbitmqc_BINARY_DIR}/librabbitmq"
 )
-set(RABBITMQ_HEADER_FOUND FALSE)
-foreach(candidate ${RABBITMQ_INCLUDE_CANDIDATES})
-    if(EXISTS "${candidate}/amqp.h")
-        target_include_directories(${PROJECT_NAME} PRIVATE "${candidate}")
-        set(RABBITMQ_HEADER_FOUND TRUE)
-        break()
-    elseif(EXISTS "${candidate}/rabbitmq-c/amqp.h")
-        target_include_directories(${PROJECT_NAME} PRIVATE "${candidate}")
-        set(RABBITMQ_HEADER_FOUND TRUE)
-        break()
-    endif()
-endforeach()
-if(NOT RABBITMQ_HEADER_FOUND)
-    message(FATAL_ERROR "Could not find amqp.h from rabbitmq-c")
-endif()
+target_include_directories(${PROJECT_NAME} PRIVATE ${RABBITMQC_INCLUDE_DIRS})
 
+# ------------------------------------------------------------
+# link everything
+# ------------------------------------------------------------
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
-        ${PQXX_TARGET}         # libpqxx from system
-        libpq_iface            # libpq from system
-        ${RABBITMQ_TARGET}
-        paho-mqtt3cs
+        ${PQXX_TARGET}     # libpqxx
+        libpq_iface        # libpq
+        ${RABBITMQ_TARGET} # rabbitmq-c
+        paho-mqtt3cs       # from paho-mqtt-c
 )
