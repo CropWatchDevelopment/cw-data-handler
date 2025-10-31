@@ -1,0 +1,21 @@
+# Ignore configuration files
+config.json
+settings.yaml
+.env
+# Ignore log files
+logs/
+*.log
+# Ignore temporary files
+tmp/
+*.tmp
+# Ignore build artifacts
+dist/
+build/
+*.o
+*.exe
+# C/C++ specific ignores
+*.obj
+*.lib
+*.dll
+*.so
+*.dylib

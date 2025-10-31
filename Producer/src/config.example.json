@@ -1,0 +1,20 @@
+{
+  "mqtt_sources": [
+    {
+      "host": "HOSTNAME",
+      "port": 1883,
+      "username": "USER",
+      "password": "PASSWORD",
+      "topic": "#"
+    }
+  ],
+  "lavinmq": {
+    "host": "LAVINMQ_HOST",
+    "port": 5672,
+    "username": "LAVINMQ_USERNAME",
+    "password": "LAVINMQ_PASSWORD",
+    "vhost": "LAVINMQ_VHOST",
+    "exchange": "amq.topic",
+    "routing_key": "things.data"
+  }
+}

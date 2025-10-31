@@ -1,0 +1,65 @@
+{
+  "postgres": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "cw_data",
+    "user": "cw_user",
+    "password": "change-me",
+    "sslmode": "prefer",
+    "connect_timeout": 5
+  },
+  "lavinmq": {
+    "host": "localhost",
+    "port": 5672,
+    "username": "guest",
+    "password": "guest",
+    "virtual_host": "/",
+    "heartbeat": 60,
+    "connection_name": "cw-data-transfer",
+    "tls": false
+  },
+  "mqtt_connections": [
+    {
+      "name": "ttn-eu1",
+      "host": "eu1.cloud.thethings.network",
+      "port": 8883,
+      "username": "your-app-id@ttn",
+      "password": "NNSXS.YOUR-TTN-API-KEY",
+      "client_id": "cw-data-transfer-ttn",
+      "keep_alive": 30,
+      "use_tls": true,
+      "clean_session": true,
+      "ca_cert": "",
+      "client_cert": "",
+      "client_key": "",
+      "tls_insecure": false,
+      "topics": [
+        {
+          "filter": "v3/your-app-id@ttn/devices/+/up",
+          "qos": 1
+        }
+      ]
+    },
+    {
+      "name": "local-mqtt",
+      "host": "localhost",
+      "port": 1883,
+      "username": "guest",
+      "password": "guest",
+      "client_id": "cw-data-transfer-local",
+      "keep_alive": 60,
+      "use_tls": false,
+      "clean_session": true,
+      "ca_cert": "",
+      "client_cert": "",
+      "client_key": "",
+      "tls_insecure": false,
+      "topics": [
+        {
+          "filter": "sensors/#",
+          "qos": 0
+        }
+      ]
+    }
+  ]
+}
