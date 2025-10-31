@@ -1,3 +1,0 @@
-/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/paho_mqtt_c-populate.dir
-/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/edit_cache.dir
-/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/rebuild_cache.dir

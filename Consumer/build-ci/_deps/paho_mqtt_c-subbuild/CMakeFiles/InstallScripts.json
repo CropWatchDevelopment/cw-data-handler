@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

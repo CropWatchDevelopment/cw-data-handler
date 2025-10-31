@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/rabbitmqc-subbuild/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
