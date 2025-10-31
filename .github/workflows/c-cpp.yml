@@ -62,3 +62,60 @@ jobs:
       - name: Test ${{ matrix.project }}
         run: ctest --output-on-failure
         working-directory: ${{ matrix.project }}/build-ci
+
+  build_pi:
+    runs-on: [ self-hosted, Linux, ARM64 ]
+    strategy:
+      matrix:
+        project: [ "Consumer", "Producer" ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: true
+          submodules: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            pkg-config \
+            libpq-dev \
+            libpqxx-dev \
+            libssl-dev \
+            zlib1g-dev \
+            libmosquitto-dev \
+            librabbitmq-dev
+
+      - name: Remove accidental build submodules
+        run: |
+          rm -f .gitmodules || true
+          git submodule deinit -f . || true
+          git config --global --add safe.directory $PWD
+
+      - name: Purge accidental vendored libpqxx
+        run: |
+          rm -rf ${{ matrix.project }}/build-pi/_deps/libpqxx-src || true
+          rm -rf ${{ matrix.project }}/_deps/libpqxx-src || true
+          rm -rf build-pi/_deps/libpqxx-src || true
+
+      - name: Show pqxx pkg-config
+        run: |
+          pkg-config --modversion libpqxx || true
+          pkg-config --cflags --libs libpqxx || true
+
+      - name: Clean build dir
+        run: rm -rf ${{ matrix.project }}/build-pi
+
+      - name: Configure ${{ matrix.project }} (Pi)
+        run: cmake -S ${{ matrix.project }} -B ${{ matrix.project }}/build-pi -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build ${{ matrix.project }} (Pi)
+        run: cmake --build ${{ matrix.project }}/build-pi --config Release -- -j$(nproc)
+
+      - name: Test ${{ matrix.project }} (Pi)
+        run: ctest --output-on-failure
+        working-directory: ${{ matrix.project }}/build-pi
