@@ -14,7 +14,6 @@
 #include <rabbitmq-c/tcp_socket.h>
 #include <rabbitmq-c/ssl_socket.h>
 #else
-#error "amqp.h not found"
 #endif
 
 struct LavinMQMessage
