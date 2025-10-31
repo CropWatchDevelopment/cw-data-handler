@@ -15,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false   # important: don't try to init CMake-generated dirs as submodules
 
       - name: Install build dependencies
         run: |
@@ -30,7 +32,6 @@ jobs:
             libmosquitto-dev \
             librabbitmq-dev
 
-      # 🔧 always start from a clean build dir
       - name: Clean build dir
         run: rm -rf ${{ matrix.project }}/build-ci
 
@@ -50,6 +51,8 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
 
       - name: Install runtime/build deps on Pi
         run: |
