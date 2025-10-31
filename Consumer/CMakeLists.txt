@@ -10,13 +10,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
-option(CW_USE_BUNDLED_PQXX "Download/build our own libpqxx" ON)
-
+# -------------------------------------------------------------------------------------------------
+# simdjson (always fetched)
+# -------------------------------------------------------------------------------------------------
 set(FETCHCONTENT_QUIET OFF)
 
-# ------------------------------------------------------------
-# simdjson
-# ------------------------------------------------------------
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -26,29 +24,34 @@ set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
 
-# ------------------------------------------------------------
-# libpqxx (force 7.9.1 in CI)
-# ------------------------------------------------------------
-if(CW_USE_BUNDLED_PQXX)
-    message(STATUS "pqxx: using bundled libpqxx (7.9.1)")
+# -------------------------------------------------------------------------------------------------
+# libpqxx – prefer system, only fetch if NOT found
+# -------------------------------------------------------------------------------------------------
+# 1) try system (this is what works on GitHub Actions because we did: apt-get install libpqxx-dev)
+find_package(pqxx 7.8 QUIET)
+
+if (NOT pqxx_FOUND)
+    message(STATUS "System libpqxx not found – falling back to FetchContent")
+
     FetchContent_Declare(
         libpqxx
         GIT_REPOSITORY https://github.com/jtv/libpqxx.git
         GIT_TAG 7.9.1
     )
-    # these options avoid building docs/tests
-    set(PQXX_BUILD_DOC OFF CACHE BOOL "" FORCE)
-    set(PQXX_BUILD_TEST OFF CACHE BOOL "" FORCE)
+
+    # we do NOT touch libpqxx's cmake/config.cmake anymore
+    set(SKIP_BUILD_TEST ON CACHE BOOL "" FORCE)
+    set(BUILD_TEST OFF CACHE BOOL "" FORCE)
+    set(BUILD_DOC  OFF CACHE BOOL "" FORCE)
+
     FetchContent_MakeAvailable(libpqxx)
-    # after this we should have target "pqxx"
 else()
-    message(STATUS "pqxx: using system libpqxx (find_package/pkconfig)")
-    find_package(pqxx REQUIRED)
+    message(STATUS "Using system libpqxx: ${pqxx_VERSION}")
 endif()
 
-# ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # rabbitmq-c
-# ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 FetchContent_Declare(
     rabbitmqc
     GIT_REPOSITORY https://github.com/alanxz/rabbitmq-c.git
@@ -58,9 +61,9 @@ set(ENABLE_SSL OFF CACHE BOOL "" FORCE)
 set(ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rabbitmqc)
 
-# ------------------------------------------------------------
-# paho mqtt c
-# ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+# paho.mqtt.c
+# -------------------------------------------------------------------------------------------------
 FetchContent_Declare(
     paho_mqtt_c
     GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
@@ -71,31 +74,20 @@ set(PAHO_BUILD_SHARED ON CACHE BOOL "" FORCE)
 set(PAHO_BUILD_STATIC OFF CACHE BOOL "" FORCE)
 set(PAHO_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 set(PAHO_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-FetchContent_GetProperties(paho_mqtt_c)
-if(NOT paho_mqtt_c_POPULATED)
-    FetchContent_Populate(paho_mqtt_c)
-    set(_paho_c_cmake "${paho_mqtt_c_SOURCE_DIR}/CMakeLists.txt")
-    if(EXISTS "${_paho_c_cmake}")
-        file(READ "${_paho_c_cmake}" _paho_c_contents)
-        string(REPLACE "CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)"
-                       "cmake_minimum_required(VERSION 3.5)"
-                       _paho_c_contents "${_paho_c_contents}")
-        file(WRITE "${_paho_c_cmake}" "${_paho_c_contents}")
-    endif()
-    add_subdirectory(${paho_mqtt_c_SOURCE_DIR} ${paho_mqtt_c_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
+FetchContent_MakeAvailable(paho_mqtt_c)
 
-# ------------------------------------------------------------
-# sources
-# ------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
+# Project sources
+# -------------------------------------------------------------------------------------------------
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
+
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
-# rabbitmq target detection
+# pick rabbitmq target name
 if(TARGET rabbitmq::rabbitmq)
     set(RABBITMQ_TARGET rabbitmq::rabbitmq)
 elseif(TARGET rabbitmq)
@@ -104,15 +96,23 @@ else()
     message(FATAL_ERROR "RabbitMQ target was not created by FetchContent")
 endif()
 
+# link
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
-        pqxx
         ${RABBITMQ_TARGET}
         paho-mqtt3cs
 )
 
-# rabbitmq headers
+# if we found system pqxx, link it
+if (pqxx_FOUND)
+    target_link_libraries(${PROJECT_NAME} PRIVATE pqxx)
+else()
+    # we fetched it – target is usually just "pqxx"
+    target_link_libraries(${PROJECT_NAME} PRIVATE pqxx)
+endif()
+
+# include dirs for rabbitmq-c
 set(RABBITMQ_INCLUDE_CANDIDATES
     "${rabbitmqc_SOURCE_DIR}/include"
     "${rabbitmqc_BINARY_DIR}/include"
