@@ -15,6 +15,7 @@
 #include <rabbitmq-c/ssl_socket.h>
 #else
 #endif
+#include <amqp.h>
 
 struct LavinMQMessage
 {
