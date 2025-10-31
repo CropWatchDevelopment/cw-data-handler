@@ -12,6 +12,7 @@ settings.yaml
 # if you ever have per-service config:
 **/secrets/
 **/config/*.json
+Consumer/build-ci/
 
 # =========================
 # 2. BUILD / ARTIFACTS (ANYWHERE)
@@ -54,3 +55,4 @@ logs/
 .DS_Store
 Thumbs.db
 
+Consumer/build-ci/
