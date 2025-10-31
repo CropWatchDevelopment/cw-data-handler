@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/paho_mqtt_c-populate"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/paho_mqtt_c-populate.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/CMakeFiles/paho_mqtt_c-populate-complete.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-build.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-configure.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-download.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-install.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-patch.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-test.rule"
+		},
+		{
+			"file" : "/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-subbuild/paho_mqtt_c-populate-prefix/src/paho_mqtt_c-populate-stamp/paho_mqtt_c-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"paho_mqtt_c-populate"
+		],
+		"name" : "paho_mqtt_c-populate"
+	}
+}

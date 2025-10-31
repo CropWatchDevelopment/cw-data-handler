@@ -16,6 +16,7 @@ include(FetchContent)
 
 set(FETCHCONTENT_QUIET OFF)
 
+# ---------------- simdjson ----------------
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -25,44 +26,18 @@ set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
 
-FetchContent_Declare(
-    libpqxx
-    GIT_REPOSITORY https://github.com/jtv/libpqxx.git
-    GIT_TAG 7.9.1
-)
-set(SKIP_BUILD_TEST ON CACHE BOOL "" FORCE)
-FetchContent_GetProperties(libpqxx)
-if(NOT libpqxx_POPULATED)
-    FetchContent_Populate(libpqxx)
-    set(BUILD_DOC OFF CACHE BOOL "" FORCE)
-    set(BUILD_TEST OFF CACHE BOOL "" FORCE)
-    set(_libpqxx_config "${libpqxx_SOURCE_DIR}/cmake/config.cmake")
-    if(EXISTS "${_libpqxx_config}")
-        file(READ "${_libpqxx_config}" _libpqxx_config_contents)
-        if(NOT _libpqxx_config_contents MATCHES "_cw_dt_module_dirs")
-            file(WRITE "${_libpqxx_config}"
-"set(_cw_dt_module_dirs \"\")\n"
-"if(EXISTS \"${CMAKE_ROOT}/Modules/CMakeDetermineCompileFeatures.cmake\")\n"
-"    list(APPEND _cw_dt_module_dirs \"${CMAKE_ROOT}/Modules\")\n"
-"endif()\n"
-"if(NOT _cw_dt_module_dirs)\n"
-"    file(GLOB _cw_dt_module_dirs\n"
-"        \"${CMAKE_ROOT}/../cmake-*/Modules\"\n"
-"        \"${CMAKE_ROOT}/../cmake/Modules\"\n"
-"        \"/usr/share/cmake-*/Modules\"\n"
-"        \"/usr/local/share/cmake-*/Modules\")\n"
-"endif()\n"
-"if(_cw_dt_module_dirs)\n"
-"    list(APPEND CMAKE_MODULE_PATH \${_cw_dt_module_dirs})\n"
-"    list(REMOVE_DUPLICATES CMAKE_MODULE_PATH)\n"
-"endif()\n"
-"unset(_cw_dt_module_dirs)\n"
-"${_libpqxx_config_contents}")
-        endif()
-    endif()
-    add_subdirectory(${libpqxx_SOURCE_DIR} ${libpqxx_BINARY_DIR} EXCLUDE_FROM_ALL)
+# ---------------- libpqxx ----------------
+# STOP auto-fetching. We require the system package.
+find_package(pqxx QUIET)
+if(NOT pqxx_FOUND)
+    message(FATAL_ERROR
+        "libpqxx not found.\n"
+        "Install it first, e.g. on Debian/Raspberry Pi:\n"
+        "  sudo apt-get install -y libpqxx-dev\n"
+        "On Ubuntu GitHub runner we also install libpqxx-dev in the workflow.")
 endif()
 
+# ---------------- rabbitmq-c ----------------
 FetchContent_Declare(
     rabbitmqc
     GIT_REPOSITORY https://github.com/alanxz/rabbitmq-c.git
@@ -72,6 +47,7 @@ set(ENABLE_SSL OFF CACHE BOOL "" FORCE)
 set(ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rabbitmqc)
 
+# ---------------- paho mqtt c ----------------
 FetchContent_Declare(
     paho_mqtt_c
     GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
@@ -88,9 +64,9 @@ if(NOT paho_mqtt_c_POPULATED)
     set(_paho_c_cmake "${paho_mqtt_c_SOURCE_DIR}/CMakeLists.txt")
     if(EXISTS "${_paho_c_cmake}")
         file(READ "${_paho_c_cmake}" _paho_c_contents)
-    string(REPLACE "CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)"
-               "cmake_minimum_required(VERSION 3.5)"
-               _paho_c_contents "${_paho_c_contents}")
+        string(REPLACE "CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)"
+                       "cmake_minimum_required(VERSION 3.5)"
+                       _paho_c_contents "${_paho_c_contents}")
         file(WRITE "${_paho_c_cmake}" "${_paho_c_contents}")
     endif()
     add_subdirectory(${paho_mqtt_c_SOURCE_DIR} ${paho_mqtt_c_BINARY_DIR} EXCLUDE_FROM_ALL)
@@ -108,6 +84,7 @@ add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
+# ---------------- rabbitmq target detection ----------------
 if(TARGET rabbitmq::rabbitmq)
     set(RABBITMQ_TARGET rabbitmq::rabbitmq)
 elseif(TARGET rabbitmq)
@@ -116,14 +93,16 @@ else()
     message(FATAL_ERROR "RabbitMQ target was not created by FetchContent")
 endif()
 
+# ---------------- link ----------------
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
         pqxx
-    ${RABBITMQ_TARGET}
-    paho-mqtt3cs
+        ${RABBITMQ_TARGET}
+        paho-mqtt3cs
 )
 
+# ---------------- rabbitmq headers ----------------
 set(RABBITMQ_INCLUDE_CANDIDATES
     "${rabbitmqc_SOURCE_DIR}/include"
     "${rabbitmqc_BINARY_DIR}/include"

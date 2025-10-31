@@ -1,0 +1,1 @@
+/usr/bin/cc -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/MQTTVersion.dir/link.d CMakeFiles/MQTTVersion.dir/MQTTVersion.c.o -o MQTTVersion  -Wl,-rpath,/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-build/src: libpaho-mqtt3a.so.1.3.13 libpaho-mqtt3c.so.1.3.13 -lc -ldl -lpthread -lrt -lanl

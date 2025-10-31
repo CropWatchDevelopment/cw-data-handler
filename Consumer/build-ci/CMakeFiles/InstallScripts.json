@@ -1,0 +1,15 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/simdjson-build/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/libpqxx-build/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/libpqxx-build/src/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/libpqxx-build/include/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/rabbitmqc-build/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/rabbitmqc-build/librabbitmq/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-build/cmake_install.cmake",
+		"/home/kevin/source/C++/cw-data-transfer/Consumer/build-ci/_deps/paho_mqtt_c-build/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
