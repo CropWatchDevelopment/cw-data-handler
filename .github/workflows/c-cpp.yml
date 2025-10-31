@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: false   # important: don't try to init CMake-generated dirs as submodules
+          submodules: false
 
       - name: Install build dependencies
         run: |
@@ -32,6 +32,11 @@ jobs:
             libmosquitto-dev \
             librabbitmq-dev
 
+      - name: Show pqxx pkg-config
+        run: |
+          pkg-config --modversion libpqxx || true
+          pkg-config --cflags --libs libpqxx || true
+
       - name: Clean build dir
         run: rm -rf ${{ matrix.project }}/build-ci
 
@@ -44,40 +49,3 @@ jobs:
       - name: Test ${{ matrix.project }}
         run: ctest --output-on-failure
         working-directory: ${{ matrix.project }}/build-ci
-
-  deploy-to-pi:
-    runs-on: [self-hosted, Linux, ARM64, replic-01]
-    needs: build
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: false
-
-      - name: Install runtime/build deps on Pi
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            cmake \
-            build-essential \
-            libpq-dev \
-            libpqxx-dev \
-            libssl-dev \
-            zlib1g-dev \
-            libmosquitto-dev \
-            librabbitmq-dev
-
-      - name: Clean Pi build dir
-        run: rm -rf Consumer/build-ci
-
-      - name: Configure on Pi
-        run: cmake -S Consumer -B Consumer/build-ci -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build on Pi
-        run: cmake --build Consumer/build-ci --config Release
-
-      - name: Deploy to local service
-        run: |
-          sudo mkdir -p /opt/cw-data-handler
-          sudo cp Consumer/build-ci/cw-data-transfer /opt/cw-data-handler/ || true
-          # sudo systemctl restart cw-data-handler.service

@@ -10,10 +10,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
-# -------------------------------------------------------------------------------------------------
-# Dependencies
-# -------------------------------------------------------------------------------------------------
-
 set(FETCHCONTENT_QUIET OFF)
 
 # ---------------- simdjson ----------------
@@ -26,15 +22,29 @@ set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
 
-# ---------------- libpqxx ----------------
-# STOP auto-fetching. We require the system package.
+# ---------------- libpqxx (system first, then pkg-config) ----------------
+# try CMake config
 find_package(pqxx QUIET)
+
 if(NOT pqxx_FOUND)
-    message(FATAL_ERROR
-        "libpqxx not found.\n"
-        "Install it first, e.g. on Debian/Raspberry Pi:\n"
-        "  sudo apt-get install -y libpqxx-dev\n"
-        "On Ubuntu GitHub runner we also install libpqxx-dev in the workflow.")
+    # fall back to pkg-config
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(PQXX QUIET libpqxx)
+    endif()
+
+    if(PQXX_FOUND)
+        # create an imported target so we can link like before
+        add_library(pqxx INTERFACE)
+        target_include_directories(pqxx INTERFACE ${PQXX_INCLUDE_DIRS})
+        target_link_libraries(pqxx INTERFACE ${PQXX_LIBRARIES})
+    else()
+        message(FATAL_ERROR
+            "libpqxx not found.\n"
+            "Install it first, e.g. on Debian/Ubuntu/Raspberry Pi:\n"
+            "  sudo apt-get install -y libpqxx-dev\n"
+            "CI note: make sure your GitHub Action installs libpqxx-dev BEFORE cmake.")
+    endif()
 endif()
 
 # ---------------- rabbitmq-c ----------------
@@ -72,16 +82,12 @@ if(NOT paho_mqtt_c_POPULATED)
     add_subdirectory(${paho_mqtt_c_SOURCE_DIR} ${paho_mqtt_c_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-# -------------------------------------------------------------------------------------------------
-# Project sources
-# -------------------------------------------------------------------------------------------------
-
+# ---------------- sources ----------------
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
 )
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
-
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
 # ---------------- rabbitmq target detection ----------------
@@ -93,7 +99,6 @@ else()
     message(FATAL_ERROR "RabbitMQ target was not created by FetchContent")
 endif()
 
-# ---------------- link ----------------
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
