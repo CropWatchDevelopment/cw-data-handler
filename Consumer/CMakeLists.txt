@@ -12,7 +12,9 @@ include(FetchContent)
 
 set(FETCHCONTENT_QUIET OFF)
 
-# ---------------- simdjson ----------------
+# ------------------------------------------------------------
+# simdjson
+# ------------------------------------------------------------
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -22,32 +24,83 @@ set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
 
-# ---------------- libpqxx (system first, then pkg-config) ----------------
-# try CMake config
+# ------------------------------------------------------------
+# libpqxx (robust)
+# ------------------------------------------------------------
+# 1) try official CMake package
+message(STATUS "---- pqxx detection: step 1 (find_package) ----")
 find_package(pqxx QUIET)
 
-if(NOT pqxx_FOUND)
-    # fall back to pkg-config
+# we'll fill this
+set(HAVE_PQXX_TARGET FALSE)
+
+if(TARGET pqxx)
+    message(STATUS "pqxx: found CMake target 'pqxx'")
+    set(HAVE_PQXX_TARGET TRUE)
+endif()
+
+# 2) if not found, try pkg-config
+if(NOT HAVE_PQXX_TARGET)
+    message(STATUS "---- pqxx detection: step 2 (pkg-config) ----")
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(PQXX QUIET libpqxx)
-    endif()
-
-    if(PQXX_FOUND)
-        # create an imported target so we can link like before
-        add_library(pqxx INTERFACE)
-        target_include_directories(pqxx INTERFACE ${PQXX_INCLUDE_DIRS})
-        target_link_libraries(pqxx INTERFACE ${PQXX_LIBRARIES})
+        if(PQXX_FOUND)
+            message(STATUS "pqxx: found via pkg-config: ${PQXX_VERSION}")
+            add_library(pqxx INTERFACE)
+            target_include_directories(pqxx INTERFACE ${PQXX_INCLUDE_DIRS})
+            target_link_libraries(pqxx INTERFACE ${PQXX_LIBRARIES})
+            set(HAVE_PQXX_TARGET TRUE)
+        else()
+            message(STATUS "pqxx: pkg-config did not find libpqxx")
+        endif()
     else()
-        message(FATAL_ERROR
-            "libpqxx not found.\n"
-            "Install it first, e.g. on Debian/Ubuntu/Raspberry Pi:\n"
-            "  sudo apt-get install -y libpqxx-dev\n"
-            "CI note: make sure your GitHub Action installs libpqxx-dev BEFORE cmake.")
+        message(STATUS "pqxx: pkg-config not available")
     endif()
 endif()
 
-# ---------------- rabbitmq-c ----------------
+# 3) if still not found, brute-force the library
+if(NOT HAVE_PQXX_TARGET)
+    message(STATUS "---- pqxx detection: step 3 (find_library) ----")
+    find_path(PQXX_INCLUDE_DIR pqxx/pqxx
+        /usr/include
+        /usr/local/include
+    )
+    find_library(PQXX_LIBRARY NAMES pqxx
+        /usr/lib
+        /usr/lib/x86_64-linux-gnu
+        /usr/local/lib
+    )
+    if(PQXX_LIBRARY)
+        message(STATUS "pqxx: found library at ${PQXX_LIBRARY}")
+        add_library(pqxx UNKNOWN IMPORTED)
+        set_target_properties(pqxx PROPERTIES
+            IMPORTED_LOCATION "${PQXX_LIBRARY}"
+        )
+        if(PQXX_INCLUDE_DIR)
+            target_include_directories(pqxx INTERFACE "${PQXX_INCLUDE_DIR}")
+        endif()
+        # Also link libpq if present
+        find_library(PQ_LIBRARY NAMES pq)
+        if(PQ_LIBRARY)
+            target_link_libraries(pqxx INTERFACE "${PQ_LIBRARY}")
+        endif()
+        set(HAVE_PQXX_TARGET TRUE)
+    endif()
+endif()
+
+# 4) give up
+if(NOT HAVE_PQXX_TARGET)
+    message(FATAL_ERROR
+        "libpqxx not found.\n"
+        "Install it first, e.g. on Debian/Ubuntu/Raspberry Pi:\n"
+        "  sudo apt-get install -y libpqxx-dev\n"
+        "CI note: we expect the GitHub runner to have libpqxx-dev installed.")
+endif()
+
+# ------------------------------------------------------------
+# rabbitmq-c
+# ------------------------------------------------------------
 FetchContent_Declare(
     rabbitmqc
     GIT_REPOSITORY https://github.com/alanxz/rabbitmq-c.git
@@ -57,7 +110,9 @@ set(ENABLE_SSL OFF CACHE BOOL "" FORCE)
 set(ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rabbitmqc)
 
-# ---------------- paho mqtt c ----------------
+# ------------------------------------------------------------
+# paho mqtt c
+# ------------------------------------------------------------
 FetchContent_Declare(
     paho_mqtt_c
     GIT_REPOSITORY https://github.com/eclipse/paho.mqtt.c.git
@@ -82,7 +137,9 @@ if(NOT paho_mqtt_c_POPULATED)
     add_subdirectory(${paho_mqtt_c_SOURCE_DIR} ${paho_mqtt_c_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
 
-# ---------------- sources ----------------
+# ------------------------------------------------------------
+# sources
+# ------------------------------------------------------------
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
 )
@@ -90,7 +147,9 @@ file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
-# ---------------- rabbitmq target detection ----------------
+# ------------------------------------------------------------
+# rabbitmq target detection
+# ------------------------------------------------------------
 if(TARGET rabbitmq::rabbitmq)
     set(RABBITMQ_TARGET rabbitmq::rabbitmq)
 elseif(TARGET rabbitmq)
@@ -99,6 +158,9 @@ else()
     message(FATAL_ERROR "RabbitMQ target was not created by FetchContent")
 endif()
 
+# ------------------------------------------------------------
+# final link
+# ------------------------------------------------------------
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
@@ -107,7 +169,9 @@ target_link_libraries(${PROJECT_NAME}
         paho-mqtt3cs
 )
 
-# ---------------- rabbitmq headers ----------------
+# ------------------------------------------------------------
+# rabbitmq headers
+# ------------------------------------------------------------
 set(RABBITMQ_INCLUDE_CANDIDATES
     "${rabbitmqc_SOURCE_DIR}/include"
     "${rabbitmqc_BINARY_DIR}/include"

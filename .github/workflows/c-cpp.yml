@@ -17,6 +17,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
+          
+      - name: Remove accidental build submodules
+        run: |
+          rm -f .gitmodules
+          git submodule deinit -f .
+          git config --global --add safe.directory $PWD
 
       - name: Install build dependencies
         run: |
