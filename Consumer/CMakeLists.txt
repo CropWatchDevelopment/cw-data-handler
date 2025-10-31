@@ -11,10 +11,29 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(FetchContent)
 
 # -------------------------------------------------------------------------------------------------
-# simdjson (always fetched)
+# pqxx: prefer system ALWAYS on CI
+# If CI installed libpqxx-dev, this will succeed and we will NOT call FetchContent.
 # -------------------------------------------------------------------------------------------------
-set(FETCHCONTENT_QUIET OFF)
+find_package(PQ REQUIRED)          # libpq
+find_package(pqxx QUIET)
 
+if(NOT pqxx_FOUND)
+    # try pkg-config
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PQXX libpqxx)
+    if(PQXX_FOUND)
+        message(STATUS "Found libpqxx via pkg-config: ${PQXX_VERSION}")
+        add_library(pqxx INTERFACE)
+        target_include_directories(pqxx INTERFACE ${PQXX_INCLUDE_DIRS})
+        target_link_libraries(pqxx INTERFACE ${PQXX_LIBRARIES})
+    else()
+        message(FATAL_ERROR "libpqxx not found. Install libpqxx-dev on CI.")
+    endif()
+endif()
+
+# -------------------------------------------------------------------------------------------------
+# simdjson - this is fine to fetch
+# -------------------------------------------------------------------------------------------------
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -23,31 +42,6 @@ FetchContent_Declare(
 set(SIMDJSON_ENABLE_THREADS ON CACHE BOOL "" FORCE)
 set(SIMDJSON_ENABLE_DEPRECATED_API OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(simdjson)
-
-# -------------------------------------------------------------------------------------------------
-# libpqxx – prefer system, only fetch if NOT found
-# -------------------------------------------------------------------------------------------------
-# 1) try system (this is what works on GitHub Actions because we did: apt-get install libpqxx-dev)
-find_package(pqxx 7.8 QUIET)
-
-if (NOT pqxx_FOUND)
-    message(STATUS "System libpqxx not found – falling back to FetchContent")
-
-    FetchContent_Declare(
-        libpqxx
-        GIT_REPOSITORY https://github.com/jtv/libpqxx.git
-        GIT_TAG 7.9.1
-    )
-
-    # we do NOT touch libpqxx's cmake/config.cmake anymore
-    set(SKIP_BUILD_TEST ON CACHE BOOL "" FORCE)
-    set(BUILD_TEST OFF CACHE BOOL "" FORCE)
-    set(BUILD_DOC  OFF CACHE BOOL "" FORCE)
-
-    FetchContent_MakeAvailable(libpqxx)
-else()
-    message(STATUS "Using system libpqxx: ${pqxx_VERSION}")
-endif()
 
 # -------------------------------------------------------------------------------------------------
 # rabbitmq-c
@@ -62,7 +56,7 @@ set(ENABLE_TOOLS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(rabbitmqc)
 
 # -------------------------------------------------------------------------------------------------
-# paho.mqtt.c
+# paho-mqtt-c
 # -------------------------------------------------------------------------------------------------
 FetchContent_Declare(
     paho_mqtt_c
@@ -87,7 +81,7 @@ add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/include")
 
-# pick rabbitmq target name
+# rabbitmq target discovery
 if(TARGET rabbitmq::rabbitmq)
     set(RABBITMQ_TARGET rabbitmq::rabbitmq)
 elseif(TARGET rabbitmq)
@@ -96,23 +90,15 @@ else()
     message(FATAL_ERROR "RabbitMQ target was not created by FetchContent")
 endif()
 
-# link
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         simdjson
+        pqxx              # from system or from pkg-config wrapper above
         ${RABBITMQ_TARGET}
         paho-mqtt3cs
 )
 
-# if we found system pqxx, link it
-if (pqxx_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE pqxx)
-else()
-    # we fetched it – target is usually just "pqxx"
-    target_link_libraries(${PROJECT_NAME} PRIVATE pqxx)
-endif()
-
-# include dirs for rabbitmq-c
+# rabbitmq headers
 set(RABBITMQ_INCLUDE_CANDIDATES
     "${rabbitmqc_SOURCE_DIR}/include"
     "${rabbitmqc_BINARY_DIR}/include"

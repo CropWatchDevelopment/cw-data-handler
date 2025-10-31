@@ -20,7 +20,7 @@ jobs:
         with:
           submodules: false
 
-      # 1. install all build deps BEFORE we run cmake
+      # 1. Install system deps, including libpqxx-dev
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -35,33 +35,39 @@ jobs:
             libmosquitto-dev \
             librabbitmq-dev
 
-      # 2. nuke accidental submodule traces from previous local commits
-      #    (those Consumer/build-ci/_deps/... entries)
+      # 2. Clean up any accidental submodule traces
       - name: Remove accidental build submodules
         run: |
           rm -f .gitmodules || true
           git submodule deinit -f . || true
           git config --global --add safe.directory $PWD
 
-      # 3. show what pqxx we actually have on this runner
+      # 3. If someone committed local _deps/libpqxx-src, wipe it here
+      - name: Purge accidental vendored libpqxx
+        run: |
+          rm -rf Consumer/build-ci/_deps/libpqxx-src || true
+          rm -rf Consumer/_deps/libpqxx-src || true
+          rm -rf build-ci/_deps/libpqxx-src || true
+
+      # 4. Show what pqxx the runner has
       - name: Show pqxx pkg-config
         run: |
           pkg-config --modversion libpqxx || true
           pkg-config --cflags --libs libpqxx || true
 
-      # 4. make sure matrix project build dir is clean
+      # 5. Clean project build dir
       - name: Clean build dir
         run: rm -rf ${{ matrix.project }}/build-ci
 
-      # 5. configure that matrix project (now system libpqxx is available)
+      # 6. Configure (now it must find system libpqxx)
       - name: Configure ${{ matrix.project }}
         run: cmake -S ${{ matrix.project }} -B ${{ matrix.project }}/build-ci -DCMAKE_BUILD_TYPE=Release
 
-      # 6. build
+      # 7. Build
       - name: Build ${{ matrix.project }}
         run: cmake --build ${{ matrix.project }}/build-ci --config Release -- -j$(nproc)
 
-      # 7. test (if there are no tests, ctest will just exit 0)
+      # 8. Test
       - name: Test ${{ matrix.project }}
         run: ctest --output-on-failure
         working-directory: ${{ matrix.project }}/build-ci
