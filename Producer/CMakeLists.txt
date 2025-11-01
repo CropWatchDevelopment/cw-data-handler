@@ -8,8 +8,7 @@ include(FetchContent)
 
 FetchContent_Declare(
     simdjson
-    GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-    GIT_TAG v3.9.2
+    URL https://github.com/simdjson/simdjson/archive/refs/tags/v3.9.2.tar.gz
 )
 FetchContent_MakeAvailable(simdjson)
 

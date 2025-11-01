@@ -44,6 +44,48 @@ endif()
 include(FetchContent)
 
 # simdjson ---------------------------------------------------
+# Reuse an existing checkout when possible so CMake's FetchContent downloader
+# never needs to retry a partially-cloned directory.
+set(_simdjson_prefetched_dir "${CMAKE_SOURCE_DIR}/build-ci/_deps/simdjson-src")
+if(NOT DEFINED FETCHCONTENT_SOURCE_DIR_SIMDJSON AND EXISTS "${_simdjson_prefetched_dir}/CMakeLists.txt")
+    message(STATUS "Using vendored simdjson at ${_simdjson_prefetched_dir}")
+    set(FETCHCONTENT_SOURCE_DIR_SIMDJSON "${_simdjson_prefetched_dir}" CACHE PATH "" FORCE)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED_SIMDJSON ON CACHE BOOL "" FORCE)
+endif()
+
+if(NOT DEFINED FETCHCONTENT_SOURCE_DIR_SIMDJSON)
+    set(_simdjson_src_dir "${CMAKE_BINARY_DIR}/_deps/simdjson-src")
+    if(NOT EXISTS "${_simdjson_src_dir}/CMakeLists.txt")
+        find_package(Git REQUIRED)
+        set(_simdjson_repo "https://github.com/simdjson/simdjson.git")
+        set(_simdjson_tag "v3.9.1")
+        set(_simdjson_clone_ok OFF)
+        foreach(_try RANGE 1 3)
+            if(EXISTS "${_simdjson_src_dir}")
+                file(REMOVE_RECURSE "${_simdjson_src_dir}")
+            endif()
+            execute_process(
+                COMMAND "${GIT_EXECUTABLE}" clone --depth 1 --branch "${_simdjson_tag}" --recurse-submodules --config "advice.detachedHead=false" "${_simdjson_repo}" "${_simdjson_src_dir}"
+                RESULT_VARIABLE _git_result
+                OUTPUT_QUIET
+                ERROR_VARIABLE _git_error
+            )
+            if(NOT _git_result)
+                set(_simdjson_clone_ok ON)
+                break()
+            endif()
+            string(STRIP "${_git_error}" _git_error_stripped)
+            message(WARNING "simdjson clone attempt ${_try} failed: ${_git_error_stripped}")
+        endforeach()
+        if(NOT _simdjson_clone_ok)
+            message(FATAL_ERROR "Failed to clone simdjson (${_simdjson_repo} @ ${_simdjson_tag}). "
+                                "Ensure network access or pre-populate FETCHCONTENT_SOURCE_DIR_SIMDJSON.")
+        endif()
+    endif()
+    set(FETCHCONTENT_SOURCE_DIR_SIMDJSON "${_simdjson_src_dir}" CACHE PATH "" FORCE)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED_SIMDJSON ON CACHE BOOL "" FORCE)
+endif()
+
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
@@ -75,7 +117,31 @@ set(PAHO_BUILD_SHARED ON CACHE BOOL "" FORCE)
 set(PAHO_BUILD_STATIC OFF CACHE BOOL "" FORCE)
 set(PAHO_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
 set(PAHO_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(paho_mqtt_c)
+
+FetchContent_GetProperties(paho_mqtt_c)
+if(NOT paho_mqtt_c_POPULATED)
+    FetchContent_Populate(paho_mqtt_c)
+
+    set(_paho_root "${paho_mqtt_c_SOURCE_DIR}/CMakeLists.txt")
+    if(EXISTS "${_paho_root}")
+        file(READ "${_paho_root}" _paho_cmake_contents)
+        string(REPLACE "CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)"
+                       "CMAKE_MINIMUM_REQUIRED(VERSION 3.5)"
+                       _paho_cmake_contents "${_paho_cmake_contents}")
+        string(REPLACE "cmake_minimum_required(VERSION 2.8.12)"
+                       "cmake_minimum_required(VERSION 3.5)"
+                       _paho_cmake_contents "${_paho_cmake_contents}")
+        string(REPLACE "CMAKE_MINIMUM_REQUIRED(VERSION 2.8)"
+                       "CMAKE_MINIMUM_REQUIRED(VERSION 3.5)"
+                       _paho_cmake_contents "${_paho_cmake_contents}")
+        string(REPLACE "cmake_minimum_required(VERSION 2.8)"
+                       "cmake_minimum_required(VERSION 3.5)"
+                       _paho_cmake_contents "${_paho_cmake_contents}")
+        file(WRITE "${_paho_root}" "${_paho_cmake_contents}")
+    endif()
+
+    add_subdirectory("${paho_mqtt_c_SOURCE_DIR}" "${paho_mqtt_c_BINARY_DIR}")
+endif()
 
 # ------------------------------------------------------------
 # sources

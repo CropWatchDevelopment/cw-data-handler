@@ -4,7 +4,9 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
+#include <optional>
 #include <simdjson.h>
 #include <string>
 #include <thread>
@@ -16,14 +18,78 @@ struct gateway_info {
   double snr;
 };
 
+namespace fs = std::filesystem;
+
+namespace {
+
+std::optional<fs::path> locate_config(const fs::path &config_name) {
+  std::vector<fs::path> candidates;
+  const auto add_candidate = [&candidates](const fs::path &candidate) {
+    if (candidate.empty()) {
+      return;
+    }
+    if (std::find(candidates.begin(), candidates.end(), candidate) ==
+        candidates.end()) {
+      candidates.push_back(candidate);
+    }
+  };
+
+  const auto walk_up = [&](fs::path dir) {
+    for (int depth = 0; depth < 6 && !dir.empty(); ++depth) {
+      add_candidate(dir / config_name);
+      add_candidate(dir / "build" / config_name);
+      add_candidate(dir / "build-debug" / config_name);
+      dir = dir.parent_path();
+    }
+  };
+
+  if (config_name.is_absolute()) {
+    add_candidate(config_name);
+  } else {
+    add_candidate(config_name);
+    walk_up(fs::current_path());
+
+    std::error_code read_ec;
+    auto exe_target = fs::read_symlink("/proc/self/exe", read_ec);
+    if (!read_ec) {
+      std::error_code canon_ec;
+      auto exe_canon = fs::weakly_canonical(exe_target, canon_ec);
+      const auto &origin = canon_ec ? exe_target : exe_canon;
+      walk_up(origin.parent_path());
+    }
+  }
+
+  for (const auto &candidate : candidates) {
+    std::error_code exists_ec;
+    if (!candidate.empty() && fs::exists(candidate, exists_ec) &&
+        !exists_ec) {
+      return fs::weakly_canonical(candidate, exists_ec);
+    }
+  }
+  return std::nullopt;
+}
+
+} // namespace
+
 int main() {
   try {
-    std::cout << "Loading configuration from config.json" << std::endl;
+    auto resolved_config = locate_config("config.json");
+    if (!resolved_config) {
+      std::cerr << "Unable to locate config.json in working directory or "
+                   "parent tree."
+                << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    std::cout << "Loading configuration from "
+              << resolved_config->string() << std::endl;
 
     simdjson::dom::parser parser;
     simdjson::dom::element config;
-    if (auto error = parser.load("config.json").get(config); error) {
-      std::cerr << "Unable to load config.json: "
+    if (auto error = parser.load(resolved_config->string()).get(config);
+        error) {
+      std::cerr << "Unable to load config.json at "
+                << resolved_config->string() << ": "
                 << simdjson::error_message(error) << std::endl;
       return EXIT_FAILURE;
     }
